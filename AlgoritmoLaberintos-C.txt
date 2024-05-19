@@ -1,0 +1,185 @@
+#INCLUDE <16F887.H>
+#FUSES NOWDT, NOPUT, INTRC_IO, NOMCLR, NOPROTECT, NOBROWNOUT,NOWRT
+#USE DELAY(internal = 8MHZ)
+#USE FAST_IO(a)
+#USE FAST_IO(b)
+#USE FAST_IO(c)
+#USE FAST_IO(d)
+//#INCLUDE <LCD.C>
+float sensor [5]={15,15,15,15,15};
+int32 fosc = 20000000;
+int16 tiempo_eco=0 ;
+float calculo=0;
+float tick = 0;
+int1 listo=true,tono=0;
+signed int16 cont=0,diferencia=0;
+int permi=0,posicionado=0;
+
+#INT_RTCC 
+RELOJ()
+{
+   
+   SET_RTCC(200);    //Se carga el timer con 99
+ 
+ if(permi==0){
+    tick = (4000.0 / fosc) * 8.0;output_high(PIN_A0);delay_us(10);output_low(PIN_A0); while(!input_state(PIN_B7)){}set_timer1(0);
+    while(input_state(PIN_B7)){}tiempo_eco = get_timer1();calculo =( ((tiempo_eco/2.0)*tick*34.0)*25.4)+10;sensor[0]= calculo/10;
+    
+    tick = (4000.0 / fosc) * 8.0;output_high(PIN_A4);delay_us(10);output_low(PIN_A4);while(!input_state(PIN_B3)){}set_timer1(0);
+    while(input_state(PIN_B3)){}tiempo_eco = get_timer1();calculo =( ((tiempo_eco/2.0)*tick*34.0)*25.4)+10;sensor[1]= calculo/10;
+    diferencia=sensor[0]-sensor[1];}
+    
+    if(permi==1){
+    tick = (4000.0 / fosc) * 8.0;output_high(PIN_A0);delay_us(10);output_low(PIN_A0); while(!input_state(PIN_B7)){}set_timer1(0);
+    while(input_state(PIN_B7)){}tiempo_eco = get_timer1();calculo =( ((tiempo_eco/2.0)*tick*34.0)*25.4)+10;sensor[0]= calculo/10;
+    
+    tick = (4000.0 / fosc) * 8.0;output_high(PIN_A1);delay_us(10);output_low(PIN_A1); while(!input_state(PIN_B6)){}set_timer1(0);
+    while(input_state(PIN_B6)){}tiempo_eco = get_timer1();calculo =( ((tiempo_eco/2.0)*tick*34.0)*25.4)+10;sensor[3]= calculo/10;
+    
+    }
+    
+    if(permi==2){
+    tick = (4000.0 / fosc) * 8.0;output_high(PIN_A4);delay_us(10);output_low(PIN_A4);while(!input_state(PIN_B3)){}set_timer1(0);
+    while(input_state(PIN_B3)){}tiempo_eco = get_timer1();calculo =( ((tiempo_eco/2.0)*tick*34.0)*25.4)+10;sensor[1]= calculo/10;
+    
+     tick = (4000.0 / fosc) * 8.0;output_high(PIN_A3);delay_us(10);output_low(PIN_A3); while(!input_state(PIN_B4)){}set_timer1(0);
+    while(input_state(PIN_B4)){}tiempo_eco = get_timer1();calculo =( ((tiempo_eco/2.0)*tick*34.0)*25.4)+10;sensor[4]= calculo/10;
+    
+ 
+    }
+
+    
+    tick = (4000.0 / fosc) * 8.0;output_high(PIN_A2);delay_us(10);output_low(PIN_A2); while(!input_state(PIN_B5)){}set_timer1(0);
+    while(input_state(PIN_B5)){}tiempo_eco = get_timer1();calculo =( ((tiempo_eco/2.0)*tick*34.0)*25.4)+10;sensor[2]= calculo/10;
+    
+ 
+//!    lcd_gotoxy(1,1);
+//!    printf(lcd_putc," %0.1f",sensor[0]);
+//!    lcd_gotoxy(1,2);
+//!    printf(lcd_putc," %0.1f",sensor[1]);
+//!    lcd_gotoxy(8,2);
+//!    printf(lcd_putc," %0.1f",sensor[2]);
+     
+}
+
+#INT_EXT 
+void pulso()
+{
+
+   if(input_state(pin_b0)==0) {while(input_state(pin_b0)==0){}listo=!listo;tono=1;posicionado=0;}
+   if(listo==true && tono==1){output_high(pin_d7);delay_ms(500);output_low(pin_d7);tono=0;}   // detenido
+   if(listo==false && tono==1){for(int n=0;n<4;n++){output_high(pin_d7);delay_ms(40);output_low(pin_d7);delay_ms(40);}tono=0; ENABLE_INTERRUPTS(INT_RTCC);  }  // en marcha
+  
+
+}
+
+
+void motor_izquierdo (int16 velocidad1,int1 direccion1)
+{
+if(direccion1==1)output_high(pin_c3),velocidad1=500-velocidad1;
+if(direccion1==0)output_low(pin_c3);
+   set_pwm1_duty(velocidad1);    
+}
+
+
+void motor_derecho (int16 velocidad2,int1 direccion2)
+{
+if(direccion2==1)output_high(pin_c0),velocidad2=500-velocidad2;
+if(direccion2==0)output_low(pin_c0);
+   set_pwm2_duty(velocidad2);    
+}
+
+
+
+void main()
+{
+   //lcd_init();
+   
+   
+   SETUP_TIMER_0(RTCC_INTERNAL|RTCC_DIV_128|RTCC_8_bit); // timer para la interrupcion por desbordamiento
+   DISABLE_INTERRUPTS(INT_RTCC);     
+   SET_RTCC(200);
+   
+   
+   
+   
+   setup_timer_1(T1_INTERNAL | T1_DIV_BY_8); // timer para recolectar el sensor  
+   ext_int_edge(h_to_l);
+   enable_interrupts(int_ext);
+   setup_timer_2(T2_DIV_BY_16, 125,1); // timer para el pwm
+   setup_ccp1( CCP_PWM );
+   setup_ccp2( CCP_PWM );
+   set_pwm1_duty(0); set_pwm2_duty(0);
+   enable_interrupts(global);
+   SET_TRIS_A(0);SET_TRIS_B(255);port_b_pullups(255); SET_TRIS_C(0);OUTPUT_C(0);
+   OUTPUT_A(0);OUTPUT_A(0);
+   SET_TRIS_D(0);OUTPUT_D(0);
+   
+   while(true)
+   {
+
+
+ if(listo==true) {output_low(pin_d7);motor_izquierdo(0,0);motor_derecho(0,0);cont=0;posicionado=0;}
+
+ if(diferencia <=(-1) && listo== false && posicionado==0)posicionado=1; // si el sensor 1 esta en rango y se pulsa el boton de inicio
+ if(diferencia >= 1 && listo== false && posicionado==0)posicionado=2; // si el sensor 5 esta en rango y se pulsa el boton de inicio
+                   
+ 
+  /////////////// /////////////// /////////////// /////////////// /////////////// /////////////// /////////////// /////////////// /////////////// ///////////////
+ 
+ 
+     while(posicionado==1){
+     
+if(sensor[0]>12) {if(cont>=100)cont=100;if(cont<=(-100))cont=(-100);}
+      
+
+if(sensor[0]<12){
+if(sensor[0]>6)  motor_izquierdo(170,0);motor_derecho(500,0);
+if(sensor[0]<6) motor_izquierdo(500,0),motor_derecho(170,0);
+}
+if(sensor[0]>12) cont=cont+10;
+
+    
+   
+     if (sensor[0]>12) motor_izquierdo(200-cont,0),motor_derecho(200+cont,0);
+     
+     
+     if(sensor[3]<=9){while(1){motor_izquierdo(200,0);motor_derecho(0,1);if(sensor[3]>=5){break;}}} // diagonal
+     if(sensor[2]<12){ while(sensor[2]<10) {motor_izquierdo(0,0);motor_derecho(0,0);delay_ms(30);motor_izquierdo(300,0);motor_derecho(0,1);delay_ms(200);motor_izquierdo(0,0);motor_derecho(300,1);delay_ms(150);}} // delantero
+     if(sensor[0]<=4){ motor_izquierdo(0,0);motor_derecho(0,0);motor_izquierdo(200,0);motor_derecho(0,1);delay_ms(50);} // fusible pa afuera
+    
+     
+     output_low(pin_d7); permi=1;
+                       }
+     
+     /////////////// /////////////// /////////////// /////////////// /////////////// /////////////// /////////////// /////////////// ///////////////
+     
+     while(posicionado==2){
+     
+     
+     
+     if(sensor[1]>=0 && sensor[1]<7){if(cont>=30)cont=30;if(cont<=(-30))cont=(-30);} // hacia fuera
+     if(sensor[1]>7  && sensor[1]<12){if(cont>=25)cont=25;if(cont<=(-25))cont=(-25);}  // hacia dentro
+    // if(sensor[1]>10  && sensor[1]<18){if(cont>=60)cont=60;if(cont<=(-60))cont=(-60);}  // hacia adentro
+     if(sensor[1]>12)                {if(cont>=115)cont=115;if(cont<=(-115))cont=(-115);}
+               
+
+     if(sensor[1]>7) cont=cont+1;
+     if(sensor[1]<7) cont=cont-1;
+     
+     motor_izquierdo(200+cont,0);motor_derecho(200-cont,0);
+     
+     
+     if(sensor[4]<=9){motor_izquierdo(0,0);motor_derecho(0,0);motor_izquierdo(0,1);motor_derecho(135,0);delay_ms(100);} // sensor diagonal
+     if(sensor[2]<=10){motor_izquierdo(0,0);motor_derecho(0,0);motor_izquierdo(0,1);motor_derecho(135,0);delay_ms(500);motor_izquierdo(135,1);motor_derecho(0,0);delay_ms(500);} // sensor delantero
+    
+     if(sensor[1]<=4){motor_izquierdo(0,0);motor_derecho(0,0);motor_izquierdo(0,1);motor_derecho(135,0);delay_ms(100);} // fusible pa fuera
+      
+  
+     output_low(pin_d7);permi=2;
+                       }
+ /////////////// /////////////// /////////////// /////////////// /////////////// /////////////// /////////////// /////////////// /////////////// ///////////////
+      
+      
+   }
+}
